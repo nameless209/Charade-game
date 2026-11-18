@@ -1,0 +1,1495 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jeu de Mimes & Charades - TV & Écran Mime Connectés</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Font: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        @keyframes popIn {
+            0% { transform: scale(0.92); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .animate-pop {
+            animation: popIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        @keyframes pulseFast {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.06); }
+        }
+        .animate-pulse-fast {
+            animation: pulseFast 0.8s infinite ease-in-out;
+        }
+    </style>
+</head>
+<body class="bg-pink-50 text-pink-950 min-h-screen p-3 sm:p-6 md:p-8 flex flex-col items-center justify-center selection:bg-pink-200">
+
+    <!-- ===================================================================== -->
+    <!-- BANNIÈRE DE NOTIFICATION / FLASH POINT (+1 POINT)                     -->
+    <!-- ===================================================================== -->
+    <div id="flash-banner" class="fixed top-4 left-1/2 -translate-x-1/2 z-50 hidden px-6 py-3.5 rounded-2xl bg-emerald-600 text-white font-black text-base sm:text-xl shadow-2xl border-2 border-emerald-300 animate-pop text-center">
+        🎉 +1 POINT !
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- ÉCRAN 0 : PAGE D'ACCUEIL STYLE KAHOOT (CRÉER OU REJOINDRE UNE SALLE)   -->
+    <!-- ===================================================================== -->
+    <section id="lobby-view" class="w-full max-w-xl bg-white shadow-2xl shadow-pink-200/70 rounded-3xl p-6 sm:p-10 border-4 border-pink-200 text-center animate-pop">
+        <div class="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-pink-100 text-pink-700 text-xs font-extrabold uppercase tracking-wider mb-3">
+            <span>🎭</span> Multijoueur TV + Téléphone <span>📱</span>
+        </div>
+        <h1 class="text-3xl sm:text-5xl font-black text-pink-600 tracking-tight mb-2">
+            Jeu de Mimes
+        </h1>
+        <p class="text-xs sm:text-sm text-pink-800 font-medium mb-8">
+            Crée la salle sur l'Écran TV ou rejoins avec le code PIN sur ton téléphone !
+        </p>
+
+        <!-- Étape 1 : Créer (Écran TV Admin uniquement) ou Rejoindre (Écran Mime uniquement) -->
+        <div id="lobby-step-choice" class="space-y-4">
+            <button onclick="createNewGame()"
+                class="w-full py-5 px-6 bg-gradient-to-r from-pink-600 to-rose-500 hover:from-pink-700 hover:to-rose-600 active:scale-95 text-white rounded-2xl font-black text-lg sm:text-xl shadow-lg shadow-pink-300/60 transition cursor-pointer flex flex-col items-center justify-center">
+                <span class="flex items-center gap-2.5"><span>📺</span> Créer une partie</span>
+                <span class="text-xs font-bold text-pink-100 mt-0.5">Ouvre l'Écran TV (Admin) & génère un code PIN</span>
+            </button>
+
+            <div class="relative flex py-2 items-center">
+                <div class="flex-grow border-t-2 border-pink-100"></div>
+                <span class="flex-shrink mx-4 text-xs font-extrabold uppercase tracking-widest text-pink-400">ou</span>
+                <div class="flex-grow border-t-2 border-pink-100"></div>
+            </div>
+
+            <div class="bg-emerald-50/80 p-5 rounded-2xl border-2 border-emerald-200 flex flex-col items-center text-center">
+                <label for="lobby-join-input" class="block text-xs font-extrabold uppercase tracking-wider text-emerald-800 mb-1">
+                    📱 Rejoindre comme Écran Mime
+                </label>
+                <p class="text-[11px] font-semibold text-emerald-700 mb-3">
+                    Entre le code PIN affiché sur l'Écran TV
+                </p>
+                <div class="flex flex-col sm:flex-row items-center justify-center gap-2.5 w-full">
+                    <input type="text" id="lobby-join-input" inputmode="numeric" maxlength="6" placeholder="CODE"
+                        onkeydown="if(event.key==='Enter'){ event.preventDefault(); joinWithPinCode(); }"
+                        class="w-full max-w-[165px] mx-auto sm:mx-0 px-3 py-3 bg-white border-2 border-emerald-300 rounded-xl text-center font-black text-xl sm:text-2xl tracking-[0.2em] uppercase text-pink-950 focus:outline-none focus:border-emerald-600">
+                    <button onclick="joinWithPinCode()"
+                        class="w-full max-w-[165px] sm:w-auto px-6 py-3.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl font-black text-base shadow-md transition cursor-pointer">
+                        Entrer
+                    </button>
+                </div>
+                <p id="lobby-error-msg" class="hidden text-xs font-extrabold text-red-600 mt-2">
+                    ⚠️ Entre le code PIN de 4 chiffres affiché sur l'Écran TV !
+                </p>
+            </div>
+        </div>
+
+        <!-- ================================================================= -->
+        <!-- FLUX CRÉATEUR (ÉCRAN TV / ADMIN UNIQUEMENT) : SALLE D'ATTENTE     -->
+        <!-- ================================================================= -->
+        <div id="tv-waiting-room" class="hidden space-y-5 animate-pop">
+            <div class="flex items-center justify-between gap-2">
+                <button onclick="backToLobbyChoice()" class="px-3 py-1.5 rounded-xl bg-pink-100 hover:bg-pink-200 text-pink-800 text-xs font-extrabold transition cursor-pointer">
+                    ← Quitter la salle
+                </button>
+                <span class="px-3 py-1 rounded-full bg-pink-900 text-amber-300 text-xs font-black uppercase tracking-wider">
+                    📺 Écran TV • Admin
+                </span>
+            </div>
+
+            <!-- Code PIN style Kahoot -->
+            <div class="bg-gradient-to-br from-pink-900 to-rose-950 text-white rounded-3xl p-5 shadow-inner">
+                <div class="text-xs font-extrabold uppercase tracking-widest text-pink-300 mb-1">
+                    Salle d'attente • Code PIN de la partie
+                </div>
+                <div class="flex items-center justify-center gap-3 my-1">
+                    <div id="tv-wait-pin-display" class="text-5xl sm:text-6xl font-black tracking-[0.2em] text-amber-300 select-all">
+                        ----
+                    </div>
+                    <button onclick="copyPinToClipboard()" title="Copier le code PIN"
+                        class="px-3 py-2 rounded-xl bg-white/15 hover:bg-white/25 active:scale-95 text-white text-xs font-black transition cursor-pointer">
+                        📋 Copier
+                    </button>
+                </div>
+                <p class="text-xs text-pink-200 mt-1">
+                    Les joueurs rejoignent avec ce code sur leur téléphone (Écran Mime)
+                </p>
+            </div>
+
+            <!-- Noms d'équipes modifiables en temps réel + Joueurs connectés par équipe -->
+            <div class="bg-pink-50 p-4 sm:p-5 rounded-2xl border-2 border-pink-200 text-left space-y-4">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-extrabold uppercase tracking-wider text-pink-700">
+                        👥 Équipes & Joueurs connectés
+                    </span>
+                    <span id="tv-total-players-badge" class="px-2.5 py-0.5 rounded-full bg-pink-200 text-pink-900 text-xs font-black">
+                        0 joueur
+                    </span>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <!-- Colonne Équipe 1 -->
+                    <div class="bg-white p-3.5 rounded-2xl border-2 border-pink-300 shadow-xs">
+                        <label for="tv-wait-team1-input" class="block text-[11px] font-extrabold uppercase text-pink-600 mb-1">
+                            ✏️ Nom Équipe 1
+                        </label>
+                        <input type="text" id="tv-wait-team1-input" value="Équipe Rose"
+                            onchange="updateTeamName(1, this.value)"
+                            oninput="updateTeamName(1, this.value, false)"
+                            class="w-full px-3 py-2 bg-pink-50 focus:bg-white border-2 border-pink-200 focus:border-pink-600 rounded-xl font-black text-sm text-pink-950 focus:outline-none mb-2.5">
+                        <div class="text-[11px] font-bold text-pink-500 mb-1.5">
+                            Joueurs (<span id="tv-team1-count">0</span>) :
+                        </div>
+                        <div id="tv-team1-players-list" class="flex flex-wrap gap-1.5 min-h-[2rem]">
+                            <span class="text-xs italic text-pink-400">En attente de joueurs...</span>
+                        </div>
+                    </div>
+
+                    <!-- Colonne Équipe 2 -->
+                    <div class="bg-white p-3.5 rounded-2xl border-2 border-purple-300 shadow-xs">
+                        <label for="tv-wait-team2-input" class="block text-[11px] font-extrabold uppercase text-purple-600 mb-1">
+                            ✏️ Nom Équipe 2
+                        </label>
+                        <input type="text" id="tv-wait-team2-input" value="Équipe Violette"
+                            onchange="updateTeamName(2, this.value)"
+                            oninput="updateTeamName(2, this.value, false)"
+                            class="w-full px-3 py-2 bg-purple-50 focus:bg-white border-2 border-purple-200 focus:border-purple-600 rounded-xl font-black text-sm text-pink-950 focus:outline-none mb-2.5">
+                        <div class="text-[11px] font-bold text-purple-500 mb-1.5">
+                            Joueurs (<span id="tv-team2-count">0</span>) :
+                        </div>
+                        <div id="tv-team2-players-list" class="flex flex-wrap gap-1.5 min-h-[2rem]">
+                            <span class="text-xs italic text-purple-400">En attente de joueurs...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bouton Admin : Lancer la partie -->
+            <button onclick="adminStartGame()"
+                class="w-full py-5 px-6 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 active:scale-95 text-white rounded-2xl font-black text-xl shadow-xl shadow-emerald-200 transition cursor-pointer flex items-center justify-center gap-3">
+                <span>🚀</span> Lancer la partie
+            </button>
+        </div>
+
+        <!-- ================================================================= -->
+        <!-- FLUX JOUEUR (ÉCRAN MIME UNIQUEMENT) : CHOIX D'ÉQUIPE               -->
+        <!-- ================================================================= -->
+        <div id="mime-team-select-step" class="hidden space-y-5 animate-pop">
+            <div class="flex items-center justify-between gap-2">
+                <button onclick="backToLobbyChoice()" class="px-3 py-1.5 rounded-xl bg-pink-100 hover:bg-pink-200 text-pink-800 text-xs font-extrabold transition cursor-pointer">
+                    ← Changer de code
+                </button>
+                <span class="px-3 py-1 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-300 text-xs font-black uppercase tracking-wider">
+                    📱 Écran Mime • PIN <span id="mime-select-pin-badge">----</span>
+                </span>
+            </div>
+
+            <div>
+                <h2 class="text-2xl sm:text-3xl font-black text-pink-950">Choisis ton équipe</h2>
+                <p class="text-xs sm:text-sm text-pink-700 mt-1">
+                    Entre ton prénom puis sélectionne ton équipe pour rejoindre la salle d'attente
+                </p>
+            </div>
+
+            <!-- Saisie du pseudo -->
+            <div class="bg-pink-50 p-4 rounded-2xl border-2 border-pink-200 text-left">
+                <label for="mime-player-name-input" class="block text-xs font-extrabold uppercase tracking-wider text-pink-700 mb-1.5">
+                    Ton pseudo (facultatif)
+                </label>
+                <input type="text" id="mime-player-name-input" maxlength="18" placeholder="Ex: Alex, Sam, Léa..."
+                    class="w-full px-4 py-3 bg-white border-2 border-pink-300 rounded-xl font-extrabold text-base text-pink-950 focus:outline-none focus:border-pink-600">
+            </div>
+
+            <!-- Cartes de sélection d'équipe -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <button onclick="selectMimeTeamAndWait(1)"
+                    class="p-5 bg-gradient-to-br from-pink-50 to-rose-100 hover:from-pink-100 hover:to-rose-200 active:scale-95 border-3 border-pink-400 rounded-2xl text-center transition cursor-pointer shadow-md group">
+                    <div class="text-3xl mb-1.5 group-hover:scale-110 transition-transform">🔥</div>
+                    <div class="text-[11px] font-extrabold uppercase tracking-wider text-pink-600">Rejoindre</div>
+                    <div id="mime-choice-team1-name" class="font-black text-xl text-pink-950 mt-0.5">Équipe Rose</div>
+                    <div id="mime-choice-team1-count" class="text-xs font-bold text-pink-700 mt-1.5">0 joueur prêt</div>
+                </button>
+
+                <button onclick="selectMimeTeamAndWait(2)"
+                    class="p-5 bg-gradient-to-br from-purple-50 to-indigo-100 hover:from-purple-100 hover:to-indigo-200 active:scale-95 border-3 border-purple-400 rounded-2xl text-center transition cursor-pointer shadow-md group">
+                    <div class="text-3xl mb-1.5 group-hover:scale-110 transition-transform">⚡</div>
+                    <div class="text-[11px] font-extrabold uppercase tracking-wider text-purple-600">Rejoindre</div>
+                    <div id="mime-choice-team2-name" class="font-black text-xl text-purple-950 mt-0.5">Équipe Violette</div>
+                    <div id="mime-choice-team2-count" class="text-xs font-bold text-purple-700 mt-1.5">0 joueur prêt</div>
+                </button>
+            </div>
+        </div>
+
+        <!-- ================================================================= -->
+        <!-- FLUX JOUEUR (ÉCRAN MIME UNIQUEMENT) : SALLE D'ATTENTE             -->
+        <!-- ================================================================= -->
+        <div id="mime-waiting-room" class="hidden space-y-5 animate-pop">
+            <div class="flex items-center justify-between gap-2">
+                <button onclick="changeMimeTeam()" class="px-3 py-1.5 rounded-xl bg-pink-100 hover:bg-pink-200 text-pink-800 text-xs font-extrabold transition cursor-pointer">
+                    ← Changer d'équipe
+                </button>
+                <span class="px-3 py-1 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-300 text-xs font-black uppercase tracking-wider">
+                    📱 Écran Mime • PIN <span id="mime-wait-pin-badge">----</span>
+                </span>
+            </div>
+
+            <!-- Carte de confirmation d'équipe -->
+            <div class="bg-gradient-to-br from-emerald-500 to-teal-600 text-white rounded-3xl p-6 shadow-lg">
+                <div class="text-xs font-extrabold uppercase tracking-widest text-emerald-100">
+                    Tu es prêt(e) dans :
+                </div>
+                <div id="mime-wait-chosen-team" class="text-2xl sm:text-3xl font-black mt-1">
+                    Équipe Rose
+                </div>
+                <div id="mime-wait-player-badge" class="inline-block mt-2 px-3.5 py-1 rounded-full bg-white/20 text-white text-xs font-extrabold">
+                    🎭 Joueur
+                </div>
+            </div>
+
+            <!-- Indicateur d'attente de l'admin TV -->
+            <div class="bg-amber-50 border-2 border-amber-300 rounded-2xl p-4 text-center">
+                <div class="text-2xl mb-1 animate-pulse-fast">⏳</div>
+                <p class="font-black text-sm sm:text-base text-amber-950">
+                    En attente que l'Écran TV (Admin) lance la partie...
+                </p>
+                <p class="text-xs text-amber-800 mt-1">
+                    Regarde l'Écran TV : le jeu démarrera automatiquement ici dès le lancement !
+                </p>
+            </div>
+
+            <!-- Liste des joueurs présents dans la salle -->
+            <div class="bg-pink-50 p-4 rounded-2xl border-2 border-pink-200 text-left">
+                <div class="text-xs font-extrabold uppercase tracking-wider text-pink-700 mb-2">
+                    👥 Joueurs dans la salle d'attente :
+                </div>
+                <div id="mime-wait-players-list" class="flex flex-wrap gap-1.5">
+                    <span class="text-xs text-pink-500">Chargement...</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===================================================================== -->
+    <!-- EN-TÊTE EN PARTIE (MASQUÉ SUR L'ACCUEIL & SALLE D'ATTENTE)            -->
+    <!-- ===================================================================== -->
+    <header id="game-header" class="hidden text-center mb-5 max-w-4xl w-full">
+        <div class="flex flex-wrap items-center justify-center gap-2 mb-2">
+            <button onclick="returnToLobby()" class="px-3 py-1 rounded-full bg-white hover:bg-pink-100 text-pink-700 border border-pink-300 text-xs font-extrabold transition cursor-pointer">
+                🏠 Accueil
+            </button>
+            <button onclick="copyPinToClipboard()" title="Cliquer pour copier le code PIN"
+                class="px-3.5 py-1 rounded-full bg-pink-900 hover:bg-pink-800 text-amber-300 text-xs font-black tracking-widest uppercase transition cursor-pointer">
+                PIN Salle : <span id="room-code-display">----</span> 📋
+            </button>
+            <span id="sync-status-badge" class="font-bold text-emerald-700 bg-emerald-100 px-3 py-1 rounded-full border border-emerald-200 text-xs">
+                🟢 Connecté
+            </span>
+        </div>
+
+        <h1 class="text-2xl sm:text-4xl font-black text-pink-600 tracking-tight">
+            Jeu de Mimes & Charades
+        </h1>
+
+        <!-- Badge fixe affiché uniquement quand l'Écran TV est verrouillé -->
+        <div id="tv-locked-badge-container" class="hidden mt-3 inline-flex items-center gap-2 bg-pink-100 text-pink-900 px-4 py-2 rounded-2xl border-2 border-pink-300 font-extrabold text-xs sm:text-sm shadow-xs">
+            <span>📺 Écran TV (Admin)</span>
+            <span class="text-pink-500 font-semibold">• Mots secrets protégés</span>
+        </div>
+
+        <!-- Badge fixe affiché uniquement quand l'Écran Mime est verrouillé -->
+        <div id="mime-locked-badge-container" class="hidden mt-3 inline-flex items-center gap-2 bg-emerald-100 text-emerald-950 px-4 py-2 rounded-2xl border-2 border-emerald-300 font-extrabold text-xs sm:text-sm shadow-xs">
+            <span>📱 Écran du Mime</span>
+            <span id="mime-header-team-tag" class="text-emerald-700 font-semibold">• Joueur actif</span>
+        </div>
+    </header>
+
+    <!-- ===================================================================== -->
+    <!-- VUE 1 : ÉCRAN TV (TABLEAU DES SCORES + CHRONO + CONTRÔLES)            -->
+    <!-- ===================================================================== -->
+    <main id="tv-view" class="hidden w-full max-w-4xl bg-white shadow-xl shadow-pink-200/50 rounded-3xl p-4 sm:p-6 md:p-8 border-4 border-pink-200 transition-all">
+        <!-- Tableau des scores des 2 équipes -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+            <!-- Équipe 1 -->
+            <div id="tv-team1-card" onclick="setActiveTeam(1)"
+                class="p-5 rounded-3xl border-4 border-pink-500 bg-pink-50 shadow-md transition-all cursor-pointer relative">
+                <div class="flex items-center justify-between gap-2 mb-2">
+                    <span id="tv-team1-badge" class="px-2.5 py-0.5 rounded-full bg-pink-600 text-white text-[11px] font-black uppercase tracking-wider">
+                        🔥 Tour actuel
+                    </span>
+                    <div class="flex items-center gap-1" onclick="event.stopPropagation()">
+                        <button onclick="adjustScore(1, -1)" class="w-8 h-8 rounded-xl bg-white border border-pink-300 hover:bg-pink-100 font-black text-pink-800 cursor-pointer">-1</button>
+                        <button onclick="adjustScore(1, 1)" class="w-8 h-8 rounded-xl bg-pink-600 hover:bg-pink-700 font-black text-white cursor-pointer">+1</button>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2 mb-2" onclick="event.stopPropagation()">
+                    <input type="text" id="team1-name-input" value="Équipe Rose"
+                        onchange="updateTeamName(1, this.value)"
+                        oninput="updateTeamName(1, this.value, false)"
+                        aria-label="Nom de l'équipe 1"
+                        class="w-full bg-white/75 focus:bg-white px-2.5 py-1 rounded-xl font-black text-lg sm:text-xl text-pink-950 border-2 border-dashed border-pink-300 focus:border-pink-600 focus:outline-none transition">
+                    <button type="button" onclick="focusTeamInput(1)" title="Renommer l'équipe 1"
+                        class="px-2.5 py-1.5 rounded-xl bg-white hover:bg-pink-100 border border-pink-300 text-xs font-extrabold text-pink-800 shrink-0 cursor-pointer">
+                        ✏️
+                    </button>
+                </div>
+                <div id="tv-team1-score" class="text-5xl sm:text-6xl font-black text-pink-600 tracking-tight">0</div>
+                <div id="tv-ingame-team1-players" class="mt-2 flex flex-wrap gap-1"></div>
+            </div>
+
+            <!-- Équipe 2 -->
+            <div id="tv-team2-card" onclick="setActiveTeam(2)"
+                class="p-5 rounded-3xl border-2 border-pink-200 bg-slate-50 transition-all cursor-pointer relative">
+                <div class="flex items-center justify-between gap-2 mb-2">
+                    <span id="tv-team2-badge" class="px-2.5 py-0.5 rounded-full bg-slate-200 text-slate-600 text-[11px] font-black uppercase tracking-wider">
+                        En attente
+                    </span>
+                    <div class="flex items-center gap-1" onclick="event.stopPropagation()">
+                        <button onclick="adjustScore(2, -1)" class="w-8 h-8 rounded-xl bg-white border border-pink-300 hover:bg-pink-100 font-black text-pink-800 cursor-pointer">-1</button>
+                        <button onclick="adjustScore(2, 1)" class="w-8 h-8 rounded-xl bg-pink-600 hover:bg-pink-700 font-black text-white cursor-pointer">+1</button>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2 mb-2" onclick="event.stopPropagation()">
+                    <input type="text" id="team2-name-input" value="Équipe Violette"
+                        onchange="updateTeamName(2, this.value)"
+                        oninput="updateTeamName(2, this.value, false)"
+                        aria-label="Nom de l'équipe 2"
+                        class="w-full bg-white/75 focus:bg-white px-2.5 py-1 rounded-xl font-black text-lg sm:text-xl text-pink-950 border-2 border-dashed border-pink-300 focus:border-pink-600 focus:outline-none transition">
+                    <button type="button" onclick="focusTeamInput(2)" title="Renommer l'équipe 2"
+                        class="px-2.5 py-1.5 rounded-xl bg-white hover:bg-pink-100 border border-pink-300 text-xs font-extrabold text-pink-800 shrink-0 cursor-pointer">
+                        ✏️
+                    </button>
+                </div>
+                <div id="tv-team2-score" class="text-5xl sm:text-6xl font-black text-pink-900 tracking-tight">0</div>
+                <div id="tv-ingame-team2-players" class="mt-2 flex flex-wrap gap-1"></div>
+            </div>
+        </div>
+
+        <!-- Chronomètre Géant & Statut du tour -->
+        <div class="bg-gradient-to-br from-pink-900 to-rose-950 text-white rounded-3xl p-6 sm:p-8 text-center mb-6 shadow-lg">
+            <div class="text-xs font-extrabold uppercase tracking-widest text-pink-300 mb-1">
+                Chronomètre de la manche
+            </div>
+            <div id="tv-timer-display" class="text-6xl sm:text-8xl font-black tracking-tight tabular-nums my-2 text-amber-300">
+                01:00
+            </div>
+            <div id="tv-turn-status" class="text-sm sm:text-base font-bold text-pink-100 mb-5">
+                C'est au tour de <span class="text-amber-300 underline">Équipe Rose</span> de mimer !
+            </div>
+
+            <!-- Contrôles du Chrono -->
+            <div class="flex flex-wrap items-center justify-center gap-3">
+                <button id="tv-timer-toggle-btn" onclick="toggleTimer()"
+                    class="px-6 py-3.5 rounded-2xl bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white font-black text-base shadow-lg transition cursor-pointer flex items-center gap-2">
+                    ▶️ Démarrer le chrono
+                </button>
+                <button onclick="resetTimer()"
+                    class="px-5 py-3.5 rounded-2xl bg-white/15 hover:bg-white/25 active:scale-95 text-white font-extrabold text-sm transition cursor-pointer">
+                    🔄 Réinitialiser (60s)
+                </button>
+                <button onclick="switchTurnTeam()"
+                    class="px-5 py-3.5 rounded-2xl bg-amber-400 hover:bg-amber-300 active:scale-95 text-pink-950 font-black text-sm shadow-md transition cursor-pointer">
+                    🔁 Changer d'équipe
+                </button>
+            </div>
+        </div>
+
+        <!-- Paramètres de Catégorie & Réglages -->
+        <div class="bg-pink-50 rounded-2xl p-4 sm:p-5 border-2 border-pink-200 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div class="w-full sm:w-auto flex-1">
+                <label for="category-select" class="block text-xs font-extrabold uppercase tracking-wider text-pink-700 mb-1.5">
+                    Catégorie de mots secrets
+                </label>
+                <select id="category-select" onchange="changeCategory(this.value)"
+                    class="w-full px-4 py-2.5 rounded-xl bg-white border-2 border-pink-300 font-bold text-sm text-pink-950 focus:outline-none focus:border-pink-600 cursor-pointer">
+                    <option value="all">🎲 Toutes les catégories (Mélange complet)</option>
+                    <option value="actions">🏃 Actions & Métiers</option>
+                    <option value="animaux">🦁 Animaux & Nature</option>
+                    <option value="films">🎬 Films, Séries & Célébrités</option>
+                    <option value="objets">🎸 Objets & Quotidien</option>
+                    <option value="expressions">🤪 Expressions & Situations drôles</option>
+                </select>
+            </div>
+
+            <div class="flex items-center gap-2 w-full sm:w-auto justify-end pt-2 sm:pt-5">
+                <select id="duration-select" onchange="changeDuration(this.value)" aria-label="Durée du chronomètre"
+                    class="px-3 py-2.5 rounded-xl bg-white border-2 border-pink-300 font-bold text-sm text-pink-950 cursor-pointer">
+                    <option value="45">45 sec</option>
+                    <option value="60" selected>60 sec</option>
+                    <option value="90">90 sec</option>
+                    <option value="120">120 sec</option>
+                </select>
+                <button onclick="resetFullGame()"
+                    class="px-4 py-2.5 rounded-xl bg-rose-100 hover:bg-rose-200 text-rose-800 font-extrabold text-xs sm:text-sm border border-rose-300 transition cursor-pointer">
+                    🗑️ Remettre à zéro
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <!-- ===================================================================== -->
+    <!-- VUE 2 : ÉCRAN DU MIME (TÉLÉPHONE DU JOUEUR QUI MIME)                  -->
+    <!-- ===================================================================== -->
+    <main id="mime-view" class="hidden w-full max-w-xl bg-white shadow-xl shadow-pink-200/50 rounded-3xl p-5 sm:p-8 border-4 border-emerald-300 text-center transition-all">
+        <!-- Bandeau d'état haut -->
+        <div class="flex items-center justify-between gap-2 bg-pink-50 px-4 py-2.5 rounded-2xl border border-pink-200 mb-5">
+            <div class="text-left">
+                <div class="text-[11px] font-extrabold uppercase tracking-wider text-pink-500">Équipe active</div>
+                <div id="mime-active-team-name" class="font-black text-sm sm:text-base text-pink-950">Équipe Rose</div>
+            </div>
+            <div class="text-center">
+                <div class="text-[11px] font-extrabold uppercase tracking-wider text-pink-500">Score</div>
+                <div id="mime-score-summary" class="font-black text-sm sm:text-base text-pink-700">0 - 0</div>
+            </div>
+            <div class="text-right">
+                <div class="text-[11px] font-extrabold uppercase tracking-wider text-pink-500">Chrono</div>
+                <div id="mime-timer-display" class="font-black text-lg sm:text-xl text-rose-600 tabular-nums">01:00</div>
+            </div>
+        </div>
+
+        <!-- Carte du Mot Secret -->
+        <div class="bg-gradient-to-br from-emerald-50 to-teal-50 border-4 border-emerald-300 rounded-3xl p-6 sm:p-10 mb-6 relative shadow-inner">
+            <span id="mime-category-badge" class="inline-block px-3 py-1 rounded-full bg-emerald-200 text-emerald-900 text-xs font-extrabold uppercase tracking-wider mb-3">
+                🎭 À Mimer
+            </span>
+
+            <div id="mime-word-container" class="my-4 min-h-[5rem] flex items-center justify-center">
+                <p id="mime-secret-word" class="text-3xl sm:text-5xl font-black text-emerald-950 tracking-tight leading-tight select-none">
+                    ...
+                </p>
+            </div>
+
+            <button onclick="toggleWordPrivacy()" id="toggle-hide-btn"
+                class="mt-2 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white hover:bg-emerald-100 text-emerald-800 border border-emerald-300 text-xs font-extrabold transition cursor-pointer">
+                👁️ Masquer le mot
+            </button>
+        </div>
+
+        <!-- Gros Boutons Tactiles : TROUVÉ (+1) et PASSER / SKIP -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5 mb-5">
+            <button onclick="handleWordFound()"
+                class="py-5 px-6 rounded-2xl bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 active:scale-95 text-white font-black text-xl shadow-lg shadow-emerald-200 transition cursor-pointer flex items-center justify-center gap-2">
+                <span>✅</span> Trouvé ! (+1)
+            </button>
+
+            <button onclick="handleWordSkip()"
+                class="py-5 px-6 rounded-2xl bg-amber-400 hover:bg-amber-500 active:scale-95 text-pink-950 font-black text-xl shadow-md transition cursor-pointer flex items-center justify-center gap-2">
+                <span>⏭️</span> Passer / Skip
+            </button>
+        </div>
+
+        <!-- Statut du chrono synchronisé avec la TV (le contrôle reste uniquement sur la TV) -->
+        <div class="flex flex-col sm:flex-row items-center justify-center gap-3 pt-3 border-t border-pink-100">
+            <span id="mime-timer-sync-status" class="px-3.5 py-2 rounded-xl bg-pink-50 text-pink-700 border border-pink-200 font-bold text-xs">
+                📺 Chrono piloté par l'écran TV
+            </span>
+            <button onclick="switchTurnTeam()"
+                class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-extrabold text-xs sm:text-sm transition cursor-pointer">
+                🔁 Fin du tour
+            </button>
+        </div>
+    </main>
+
+    <!-- ===================================================================== -->
+    <!-- LOGIQUE JAVASCRIPT + SYNCHRONISATION TEMPS RÉEL (FIRESTORE + LOCAL)   -->
+    <!-- ===================================================================== -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // =====================================================================
+        // BANQUE DE MOTS & CHARADES PAR CATÉGORIE
+        // =====================================================================
+        const WORD_BANK = {
+            actions: [
+                { word: "Faire du surf sur une vague géante", cat: "Actions & Métiers" },
+                { word: "Pompier qui éteint un incendie", cat: "Actions & Métiers" },
+                { word: "Changer une couche de bébé", cat: "Actions & Métiers" },
+                { word: "Chef cuisinier qui fait sauter une crêpe", cat: "Actions & Métiers" },
+                { word: "Coiffeur qui coupe une frange trop court", cat: "Actions & Métiers" },
+                { word: "Dentiste qui arrache une dent", cat: "Actions & Métiers" },
+                { word: "Astronaute qui marche sur la Lune", cat: "Actions & Métiers" },
+                { word: "Photographe de mode", cat: "Actions & Métiers" },
+                { word: "Jongleur de cirque", cat: "Actions & Métiers" },
+                { word: "Plongeur sous-marin avec un requin", cat: "Actions & Métiers" },
+                { word: "Peindre un mur en hauteur", cat: "Actions & Métiers" },
+                { word: "Traire une vache", cat: "Actions & Métiers" },
+                { word: "Faire du ski nautique", cat: "Actions & Métiers" },
+                { word: "Chef d'orchestre passionné", cat: "Actions & Métiers" },
+                { word: "Magicien qui sort un lapin du chapeau", cat: "Actions & Métiers" }
+            ],
+            animaux: [
+                { word: "Un kangourou qui fait de la boxe", cat: "Animaux & Nature" },
+                { word: "Un flamant rose sur une patte", cat: "Animaux & Nature" },
+                { word: "Un caméléon qui attrape une mouche", cat: "Animaux & Nature" },
+                { word: "Un manchot qui glisse sur la banquise", cat: "Animaux & Nature" },
+                { word: "Un gorille qui se frappe la poitrine", cat: "Animaux & Nature" },
+                { word: "Un paresseux qui traverse la route", cat: "Animaux & Nature" },
+                { word: "Un écureuil qui cache une noisette", cat: "Animaux & Nature" },
+                { word: "Une pieuvre qui nage", cat: "Animaux & Nature" },
+                { word: "Un coq qui chante au lever du soleil", cat: "Animaux & Nature" },
+                { word: "Un crabe qui marche de côté", cat: "Animaux & Nature" },
+                { word: "Un éléphant qui prend sa douche", cat: "Animaux & Nature" },
+                { word: "Un chat qui essaie d'attraper un laser", cat: "Animaux & Nature" }
+            ],
+            films: [
+                { word: "Titanic (sur la proue du bateau)", cat: "Films & Célébrités" },
+                { word: "Harry Potter sur son balai", cat: "Films & Célébrités" },
+                { word: "Spider-Man qui lance sa toile", cat: "Films & Célébrités" },
+                { word: "Dark Vador au sabre laser", cat: "Films & Célébrités" },
+                { word: "Michael Jackson (Moonwalk)", cat: "Films & Célébrités" },
+                { word: "Le Roi Lion (présentation de Simba)", cat: "Films & Célébrités" },
+                { word: "Matrix (éviter les balles au ralenti)", cat: "Films & Célébrités" },
+                { word: "Rocky Balboa qui monte les marches", cat: "Films & Célébrités" },
+                { word: "James Bond", cat: "Films & Célébrités" },
+                { word: "Elsa dans La Reine des Neiges", cat: "Films & Célébrités" },
+                { word: "Charlie Chaplin", cat: "Films & Célébrités" },
+                { word: "Batman", cat: "Films & Célébrités" }
+            ],
+            objets: [
+                { word: "Un grille-pain qui éjecte une tartine", cat: "Objets & Quotidien" },
+                { word: "Une machine à laver en essorage", cat: "Objets & Quotidien" },
+                { word: "Un aspirateur robot bloqué", cat: "Objets & Quotidien" },
+                { word: "Un parapluie retourné par le vent", cat: "Objets & Quotidien" },
+                { word: "Une tondeuse à gazon difficile à démarrer", cat: "Objets & Quotidien" },
+                { word: "Un distributeur automatique en panne", cat: "Objets & Quotidien" },
+                { word: "Une guitare électrique", cat: "Objets & Quotidien" },
+                { word: "Un appareil photo Polaroid", cat: "Objets & Quotidien" },
+                { word: "Un essuie-glace de voiture", cat: "Objets & Quotidien" },
+                { word: "Un réveil matin qui sonne trop tôt", cat: "Objets & Quotidien" },
+                { word: "Un micro-ondes qui tourne", cat: "Objets & Quotidien" }
+            ],
+            expressions: [
+                { word: "Marcher sur des œufs", cat: "Expressions drôles" },
+                { word: "Avoir le cœur sur la main", cat: "Expressions drôles" },
+                { word: "Tomber dans les pommes", cat: "Expressions drôles" },
+                { word: "Avoir la tête dans les nuages", cat: "Expressions drôles" },
+                { word: "Se lever du pied gauche", cat: "Expressions drôles" },
+                { word: "Avoir un chat dans la gorge", cat: "Expressions drôles" },
+                { word: "Casser la glace", cat: "Expressions drôles" },
+                { word: "Manger un citron très acide", cat: "Expressions drôles" },
+                { word: "Marcher pieds nus sur des Lego", cat: "Expressions drôles" },
+                { word: "Essayer d'enfiler un jean trop serré", cat: "Expressions drôles" },
+                { word: "Chercher ses lunettes qu'on a sur la tête", cat: "Expressions drôles" }
+            ]
+        };
+
+        function pickRandomWordItem(categoryKey, excludeWord = "") {
+            let pool = [];
+            if (!categoryKey || categoryKey === "all") {
+                Object.values(WORD_BANK).forEach((list) => {
+                    pool = pool.concat(list);
+                });
+            } else {
+                pool = WORD_BANK[categoryKey] || WORD_BANK.actions;
+            }
+            const filtered = pool.filter((item) => item.word !== excludeWord);
+            const candidates = filtered.length > 0 ? filtered : pool;
+            return candidates[Math.floor(Math.random() * candidates.length)];
+        }
+
+        // =====================================================================
+        // ÉTAT GLOBAL DU JEU & IDENTITÉ DU JOUEUR LOCAL
+        // =====================================================================
+        const initialWordItem = pickRandomWordItem("all");
+        let state = {
+            gameStarted: false,
+            team1Name: "Équipe Rose",
+            team2Name: "Équipe Violette",
+            team1Score: 0,
+            team2Score: 0,
+            activeTeam: 1,
+            duration: 60,
+            timeLeft: 60,
+            isRunning: false,
+            timerEndTimestamp: null,
+            category: "all",
+            currentWord: initialWordItem.word,
+            currentWordCat: initialWordItem.cat,
+            eventCounter: 0,
+            lastEventType: "",
+            players: {}
+        };
+
+        // Identifiant unique de cet onglet/appareil pour la liste des joueurs connectés
+        const localPlayerId = "p_" + Math.random().toString(36).substring(2, 10);
+        let localPlayerName = "";
+        let localChosenTeam = null; // 1 ou 2 pour Écran Mime
+
+        let db = null;
+        let authUser = null;
+        let roomCode = "1234";
+        let currentRole = null; // Strictement "tv" (créateur) ou "mime" (rejoindre avec code)
+        let currentLobbyStage = "choice"; // "choice" | "tv-waiting" | "mime-team-select" | "mime-waiting"
+        let isInsideGame = false;
+        let isWordHidden = false;
+        let unsubscribeRoom = null;
+        let broadcastChannel = null;
+        let timerLoop = null;
+        let lastEventCounterSeen = 0;
+        const LOCAL_STORAGE_PREFIX = "mime_party_state_";
+
+        // =====================================================================
+        // GESTION DES ÉTAPES DU LOBBY & SÉPARATION STRICTE DES RÔLES
+        // =====================================================================
+        function setLobbyStage(stage) {
+            currentLobbyStage = stage;
+            const stepChoice = document.getElementById("lobby-step-choice");
+            const tvWaiting = document.getElementById("tv-waiting-room");
+            const mimeSelect = document.getElementById("mime-team-select-step");
+            const mimeWaiting = document.getElementById("mime-waiting-room");
+
+            [stepChoice, tvWaiting, mimeSelect, mimeWaiting].forEach((el) => {
+                if (el) el.classList.add("hidden");
+            });
+
+            if (stage === "tv-waiting") {
+                tvWaiting.classList.remove("hidden");
+            } else if (stage === "mime-team-select") {
+                mimeSelect.classList.remove("hidden");
+            } else if (stage === "mime-waiting") {
+                mimeWaiting.classList.remove("hidden");
+            } else {
+                stepChoice.classList.remove("hidden");
+            }
+            renderUI();
+        }
+
+        // 1. CRÉATEUR : "Créer une partie" -> Strictement Écran TV (Admin) + Salle d'attente TV
+        window.createNewGame = function() {
+            ensureAudioContext();
+            currentRole = "tv";
+            isInsideGame = false;
+            roomCode = Math.floor(1000 + Math.random() * 9000).toString();
+
+            const freshWord = pickRandomWordItem("all");
+            state = {
+                gameStarted: false,
+                team1Name: "Équipe Rose",
+                team2Name: "Équipe Violette",
+                team1Score: 0,
+                team2Score: 0,
+                activeTeam: 1,
+                duration: 60,
+                timeLeft: 60,
+                isRunning: false,
+                timerEndTimestamp: null,
+                category: "all",
+                currentWord: freshWord.word,
+                currentWordCat: freshWord.cat,
+                eventCounter: 0,
+                lastEventType: "",
+                players: {}
+            };
+
+            document.getElementById("tv-wait-pin-display").innerText = roomCode;
+            document.getElementById("room-code-display").innerText = roomCode;
+            document.getElementById("lobby-error-msg").classList.add("hidden");
+
+            setupLocalBrowserSync(false);
+            subscribeToFirestoreRoom(roomCode, true);
+            pushStateToSync(true);
+            setLobbyStage("tv-waiting");
+        };
+
+        // 2. JOUEUR : Entre le code PIN -> Strictement Écran Mime + Écran de sélection d'équipe
+        window.joinWithPinCode = function() {
+            ensureAudioContext();
+            const inp = document.getElementById("lobby-join-input");
+            const err = document.getElementById("lobby-error-msg");
+            const code = inp.value.trim().toUpperCase();
+            if (!code || code.length < 3) {
+                err.classList.remove("hidden");
+                inp.focus();
+                return;
+            }
+            err.classList.add("hidden");
+
+            currentRole = "mime";
+            isInsideGame = false;
+            localChosenTeam = null;
+            roomCode = code;
+
+            document.getElementById("mime-select-pin-badge").innerText = roomCode;
+            document.getElementById("mime-wait-pin-badge").innerText = roomCode;
+            document.getElementById("room-code-display").innerText = roomCode;
+
+            setupLocalBrowserSync(true);
+            subscribeToFirestoreRoom(roomCode, false);
+            setLobbyStage("mime-team-select");
+        };
+
+        // 3. JOUEUR (Écran Mime) : Choisit son équipe -> Entre dans la salle d'attente
+        window.selectMimeTeamAndWait = function(teamNum) {
+            ensureAudioContext();
+            const nameInput = document.getElementById("mime-player-name-input");
+            const rawName = nameInput ? nameInput.value.trim() : "";
+            const existingCount = Object.keys(state.players || {}).length + 1;
+            localPlayerName = rawName || `Joueur ${existingCount}`;
+            localChosenTeam = teamNum;
+
+            if (!state.players) state.players = {};
+            state.players[localPlayerId] = {
+                id: localPlayerId,
+                name: localPlayerName,
+                team: teamNum,
+                joinedAt: Date.now()
+            };
+
+            pushPlayerJoinToSync();
+
+            // Si la partie a déjà été lancée par l'admin TV pendant la sélection, entrer directement
+            if (state.gameStarted) {
+                enterActiveGame();
+            } else {
+                setLobbyStage("mime-waiting");
+            }
+        };
+
+        window.changeMimeTeam = function() {
+            localChosenTeam = null;
+            if (state.players && state.players[localPlayerId]) {
+                delete state.players[localPlayerId];
+                pushPlayerRemoveToSync();
+            }
+            setLobbyStage("mime-team-select");
+        };
+
+        // 4. ADMIN TV : Clique sur "Lancer la partie" -> Démarre pour l'Écran TV et tous les Écrans Mime
+        window.adminStartGame = function() {
+            if (currentRole !== "tv") return;
+            ensureAudioContext();
+            state.gameStarted = true;
+            state.isRunning = false;
+            state.timerEndTimestamp = null;
+            state.timeLeft = state.duration;
+            pushStateToSync(true);
+            enterActiveGame();
+        };
+
+        function enterActiveGame() {
+            isInsideGame = true;
+            document.getElementById("lobby-view").classList.add("hidden");
+            document.getElementById("game-header").classList.remove("hidden");
+            document.body.classList.remove("justify-center");
+
+            const tvView = document.getElementById("tv-view");
+            const mimeView = document.getElementById("mime-view");
+            const tvLockedBadge = document.getElementById("tv-locked-badge-container");
+            const mimeLockedBadge = document.getElementById("mime-locked-badge-container");
+
+            if (currentRole === "tv") {
+                tvView.classList.remove("hidden");
+                mimeView.classList.add("hidden");
+                tvLockedBadge.classList.remove("hidden");
+                mimeLockedBadge.classList.add("hidden");
+            } else {
+                tvView.classList.add("hidden");
+                mimeView.classList.remove("hidden");
+                tvLockedBadge.classList.add("hidden");
+                mimeLockedBadge.classList.remove("hidden");
+            }
+            renderUI();
+        }
+
+        window.backToLobbyChoice = function() {
+            if (currentRole === "mime" && state.players && state.players[localPlayerId]) {
+                delete state.players[localPlayerId];
+                pushPlayerRemoveToSync();
+            }
+            if (unsubscribeRoom) {
+                unsubscribeRoom();
+                unsubscribeRoom = null;
+            }
+            currentRole = null;
+            localChosenTeam = null;
+            isInsideGame = false;
+            setLobbyStage("choice");
+        };
+
+        window.returnToLobby = function() {
+            isInsideGame = false;
+            document.getElementById("game-header").classList.add("hidden");
+            document.getElementById("tv-view").classList.add("hidden");
+            document.getElementById("mime-view").classList.add("hidden");
+            document.getElementById("lobby-view").classList.remove("hidden");
+            document.body.classList.add("justify-center");
+
+            if (currentRole === "tv") {
+                state.gameStarted = false;
+                state.isRunning = false;
+                state.timerEndTimestamp = null;
+                pushStateToSync(true);
+                setLobbyStage("tv-waiting");
+            } else if (currentRole === "mime") {
+                if (localChosenTeam) {
+                    setLobbyStage("mime-waiting");
+                } else {
+                    setLobbyStage("mime-team-select");
+                }
+            } else {
+                setLobbyStage("choice");
+            }
+        };
+
+        window.copyPinToClipboard = function() {
+            try {
+                const tempInput = document.createElement("input");
+                tempInput.value = roomCode;
+                document.body.appendChild(tempInput);
+                tempInput.select();
+                document.execCommand("copy");
+                document.body.removeChild(tempInput);
+                triggerFlash(true, `📋 Code PIN ${roomCode} copié !`);
+            } catch (e) {}
+        };
+
+        // =====================================================================
+        // ACTIONS DE JEU (SCORES, ÉQUIPES, CHRONO, MOTS)
+        // =====================================================================
+        window.updateTeamName = function(teamNum, newName, shouldSync = true) {
+            const defaultName = teamNum === 1 ? "Équipe Rose" : "Équipe Violette";
+            const cleaned = newName.trim() || (shouldSync ? defaultName : newName);
+            if (teamNum === 1) state.team1Name = cleaned;
+            else state.team2Name = cleaned;
+
+            const activeName = state.activeTeam === 1 ? state.team1Name : state.team2Name;
+            const statusEl = document.getElementById("tv-turn-status");
+            if (statusEl) {
+                statusEl.innerHTML = `C'est au tour de <span class="text-amber-300 underline">${activeName}</span> de mimer !`;
+            }
+            const mimeTeamEl = document.getElementById("mime-active-team-name");
+            if (mimeTeamEl) {
+                mimeTeamEl.innerText = activeName;
+            }
+
+            if (shouldSync) {
+                renderUI();
+                pushStateToSync();
+            }
+        };
+
+        window.focusTeamInput = function(teamNum) {
+            const inp = document.getElementById(`team${teamNum}-name-input`);
+            if (inp) {
+                inp.focus();
+                inp.select();
+            }
+        };
+
+        // =====================================================================
+        // EFFETS SONORES WEB AUDIO & BANNIÈRE FLASH
+        // =====================================================================
+        let audioCtx = null;
+
+        function ensureAudioContext() {
+            if (!audioCtx) {
+                const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                if (AudioContextClass) {
+                    audioCtx = new AudioContextClass();
+                }
+            }
+            if (audioCtx && audioCtx.state === "suspended") {
+                audioCtx.resume().catch(() => {});
+            }
+        }
+
+        function playChime() {
+            try {
+                ensureAudioContext();
+                if (!audioCtx) return;
+                const now = audioCtx.currentTime;
+                [523.25, 659.25, 783.99, 1046.5].forEach((freq, idx) => {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = "triangle";
+                    osc.frequency.setValueAtTime(freq, now + idx * 0.08);
+                    gain.gain.setValueAtTime(0.14, now + idx * 0.08);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.08 + 0.3);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(now + idx * 0.08);
+                    osc.stop(now + idx * 0.08 + 0.32);
+                });
+            } catch (e) {}
+        }
+
+        function playTimeUpBuzzer() {
+            try {
+                ensureAudioContext();
+                if (!audioCtx) return;
+                const now = audioCtx.currentTime;
+                [220, 185].forEach((freq, idx) => {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = "sawtooth";
+                    osc.frequency.setValueAtTime(freq, now + idx * 0.22);
+                    gain.gain.setValueAtTime(0.16, now + idx * 0.22);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.22 + 0.35);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(now + idx * 0.22);
+                    osc.stop(now + idx * 0.22 + 0.38);
+                });
+            } catch (e) {}
+        }
+
+        let flashTimeout = null;
+        function triggerFlash(isPositive, text) {
+            const banner = document.getElementById("flash-banner");
+            if (!banner) return;
+            banner.innerText = text;
+            banner.className = isPositive
+                ? "fixed top-4 left-1/2 -translate-x-1/2 z-50 px-6 py-3.5 rounded-2xl bg-emerald-600 text-white font-black text-base sm:text-xl shadow-2xl border-2 border-emerald-300 animate-pop text-center"
+                : "fixed top-4 left-1/2 -translate-x-1/2 z-50 px-6 py-3.5 rounded-2xl bg-rose-600 text-white font-black text-base sm:text-xl shadow-2xl border-2 border-rose-300 animate-pop text-center";
+            banner.classList.remove("hidden");
+            if (flashTimeout) clearTimeout(flashTimeout);
+            flashTimeout = setTimeout(() => {
+                banner.classList.add("hidden");
+            }, 2400);
+        }
+
+        // =====================================================================
+        // INITIALISATION SYNCHRONISATION (FIRESTORE + BROADCASTCHANNEL + LOCAL)
+        // =====================================================================
+        async function initSync() {
+            try {
+                if (typeof __firebase_config !== "undefined") {
+                    const firebaseConfig = JSON.parse(__firebase_config);
+                    const app = initializeApp(firebaseConfig);
+                    const auth = getAuth(app);
+                    db = getFirestore(app);
+
+                    if (typeof __initial_auth_token !== "undefined" && __initial_auth_token) {
+                        const cred = await signInWithCustomToken(auth, __initial_auth_token);
+                        authUser = cred.user;
+                    } else {
+                        const cred = await signInAnonymously(auth);
+                        authUser = cred.user;
+                    }
+                    if (currentRole) {
+                        subscribeToFirestoreRoom(roomCode, currentRole === "tv");
+                    }
+                }
+            } catch (err) {
+                console.warn("Firestore sync fallback to local cross-tab sync:", err);
+            }
+        }
+
+        function setupLocalBrowserSync(loadExisting = true) {
+            if (broadcastChannel) broadcastChannel.close();
+            if ("BroadcastChannel" in window) {
+                try {
+                    broadcastChannel = new BroadcastChannel(`mime_party_room_${roomCode}`);
+                    broadcastChannel.onmessage = (event) => {
+                        if (event.data) {
+                            applyIncomingState(event.data);
+                        }
+                    };
+                } catch (e) {}
+            }
+
+            window.removeEventListener("storage", handleStorageSync);
+            window.addEventListener("storage", handleStorageSync);
+
+            if (loadExisting) {
+                try {
+                    const saved = localStorage.getItem(LOCAL_STORAGE_PREFIX + roomCode);
+                    if (saved) {
+                        applyIncomingState(JSON.parse(saved));
+                    }
+                } catch (e) {}
+            }
+        }
+
+        function handleStorageSync(event) {
+            if (event.key === LOCAL_STORAGE_PREFIX + roomCode && event.newValue) {
+                try {
+                    applyIncomingState(JSON.parse(event.newValue));
+                } catch (e) {}
+            }
+        }
+
+        function subscribeToFirestoreRoom(code, createIfMissing = false) {
+            if (!db || !authUser) return;
+            if (unsubscribeRoom) unsubscribeRoom();
+            const appId = typeof __app_id !== "undefined" ? __app_id : "default-app-id";
+            const roomRef = doc(db, "artifacts", appId, "public", "data", "mime_rooms", code);
+
+            unsubscribeRoom = onSnapshot(roomRef, (snap) => {
+                if (snap.exists()) {
+                    applyIncomingState(snap.data());
+                } else if (createIfMissing) {
+                    pushStateToSync(true);
+                }
+            }, (error) => {
+                console.warn("Room snapshot error:", error);
+            });
+        }
+
+        async function pushStateToSync(overwriteAll = false) {
+            if (broadcastChannel) {
+                try { broadcastChannel.postMessage(state); } catch (e) {}
+            }
+            try {
+                localStorage.setItem(LOCAL_STORAGE_PREFIX + roomCode, JSON.stringify(state));
+            } catch (e) {}
+
+            if (db && authUser) {
+                try {
+                    const appId = typeof __app_id !== "undefined" ? __app_id : "default-app-id";
+                    const roomRef = doc(db, "artifacts", appId, "public", "data", "mime_rooms", roomCode);
+                    if (overwriteAll) {
+                        await setDoc(roomRef, state);
+                    } else {
+                        await setDoc(roomRef, state, { merge: true });
+                    }
+                } catch (err) {
+                    console.warn("Failed to sync room state:", err);
+                }
+            }
+        }
+
+        async function pushPlayerJoinToSync() {
+            if (broadcastChannel) {
+                try { broadcastChannel.postMessage(state); } catch (e) {}
+            }
+            try {
+                localStorage.setItem(LOCAL_STORAGE_PREFIX + roomCode, JSON.stringify(state));
+            } catch (e) {}
+
+            if (db && authUser && state.players[localPlayerId]) {
+                try {
+                    const appId = typeof __app_id !== "undefined" ? __app_id : "default-app-id";
+                    const roomRef = doc(db, "artifacts", appId, "public", "data", "mime_rooms", roomCode);
+                    await updateDoc(roomRef, {
+                        [`players.${localPlayerId}`]: state.players[localPlayerId]
+                    });
+                } catch (err) {
+                    await pushStateToSync(false);
+                }
+            }
+        }
+
+        async function pushPlayerRemoveToSync() {
+            if (broadcastChannel) {
+                try { broadcastChannel.postMessage(state); } catch (e) {}
+            }
+            try {
+                localStorage.setItem(LOCAL_STORAGE_PREFIX + roomCode, JSON.stringify(state));
+            } catch (e) {}
+
+            if (db && authUser) {
+                try {
+                    const appId = typeof __app_id !== "undefined" ? __app_id : "default-app-id";
+                    const roomRef = doc(db, "artifacts", appId, "public", "data", "mime_rooms", roomCode);
+                    await setDoc(roomRef, { players: state.players }, { merge: true });
+                } catch (err) {}
+            }
+        }
+
+        function applyIncomingState(incoming) {
+            const isNewPointEvent = incoming.eventCounter > lastEventCounterSeen && incoming.lastEventType === "found";
+            lastEventCounterSeen = Math.max(lastEventCounterSeen, incoming.eventCounter || 0);
+
+            // Préserver l'inscription locale si l'état distant n'a pas encore reçu ce joueur
+            const mergedPlayers = { ...(incoming.players || {}) };
+            if (currentRole === "mime" && localChosenTeam && !mergedPlayers[localPlayerId]) {
+                mergedPlayers[localPlayerId] = {
+                    id: localPlayerId,
+                    name: localPlayerName || "Joueur",
+                    team: localChosenTeam,
+                    joinedAt: Date.now()
+                };
+            }
+
+            state = { ...state, ...incoming, players: mergedPlayers };
+
+            // Transition automatique de la salle d'attente vers la partie dès que l'admin TV lance la partie
+            if (state.gameStarted && !isInsideGame && currentRole) {
+                if (currentRole === "tv" || (currentRole === "mime" && localChosenTeam)) {
+                    enterActiveGame();
+                    return;
+                }
+            }
+
+            // Retour automatique en salle d'attente si l'admin TV retourne au lobby
+            if (!state.gameStarted && isInsideGame && currentRole === "mime") {
+                isInsideGame = false;
+                document.getElementById("game-header").classList.add("hidden");
+                document.getElementById("mime-view").classList.add("hidden");
+                document.getElementById("lobby-view").classList.remove("hidden");
+                document.body.classList.add("justify-center");
+                setLobbyStage(localChosenTeam ? "mime-waiting" : "mime-team-select");
+                return;
+            }
+
+            renderUI();
+
+            if (isNewPointEvent && isInsideGame) {
+                playChime();
+                triggerFlash(true, `🎉 +1 POINT pour ${state.activeTeam === 1 ? state.team1Name : state.team2Name} !`);
+            }
+        }
+
+        // =====================================================================
+        // ACTIONS EN PARTIE (SCORES, ÉQUIPES, CHRONO, MOTS)
+        // =====================================================================
+        window.adjustScore = function(teamNum, delta) {
+            ensureAudioContext();
+            if (teamNum === 1) state.team1Score = Math.max(0, state.team1Score + delta);
+            else state.team2Score = Math.max(0, state.team2Score + delta);
+            renderUI();
+            pushStateToSync();
+        };
+
+        window.setActiveTeam = function(teamNum) {
+            state.activeTeam = teamNum;
+            renderUI();
+            pushStateToSync();
+        };
+
+        window.switchTurnTeam = function() {
+            ensureAudioContext();
+            state.activeTeam = state.activeTeam === 1 ? 2 : 1;
+            state.isRunning = false;
+            state.timerEndTimestamp = null;
+            state.timeLeft = state.duration;
+            const nextWord = pickRandomWordItem(state.category, state.currentWord);
+            state.currentWord = nextWord.word;
+            state.currentWordCat = nextWord.cat;
+            isWordHidden = false;
+            renderUI();
+            pushStateToSync();
+        };
+
+        window.toggleTimer = function() {
+            if (currentRole !== "tv") return;
+            ensureAudioContext();
+            if (state.isRunning) {
+                const remaining = state.timerEndTimestamp
+                    ? Math.max(0, Math.ceil((state.timerEndTimestamp - Date.now()) / 1000))
+                    : state.timeLeft;
+                state.timeLeft = remaining;
+                state.isRunning = false;
+                state.timerEndTimestamp = null;
+            } else {
+                if (state.timeLeft <= 0) state.timeLeft = state.duration;
+                state.isRunning = true;
+                state.timerEndTimestamp = Date.now() + state.timeLeft * 1000;
+            }
+            renderUI();
+            pushStateToSync();
+        };
+
+        window.resetTimer = function() {
+            if (currentRole !== "tv") return;
+            state.isRunning = false;
+            state.timerEndTimestamp = null;
+            state.timeLeft = state.duration;
+            renderUI();
+            pushStateToSync();
+        };
+
+        window.changeCategory = function(newCategory) {
+            state.category = newCategory;
+            const nextWord = pickRandomWordItem(state.category, state.currentWord);
+            state.currentWord = nextWord.word;
+            state.currentWordCat = nextWord.cat;
+            isWordHidden = false;
+            renderUI();
+            pushStateToSync();
+        };
+
+        window.changeDuration = function(newDurationStr) {
+            const dur = parseInt(newDurationStr, 10) || 60;
+            state.duration = dur;
+            if (!state.isRunning) {
+                state.timeLeft = dur;
+            }
+            renderUI();
+            pushStateToSync();
+        };
+
+        window.resetFullGame = function() {
+            state.team1Score = 0;
+            state.team2Score = 0;
+            state.activeTeam = 1;
+            state.isRunning = false;
+            state.timerEndTimestamp = null;
+            state.timeLeft = state.duration;
+            const nextWord = pickRandomWordItem(state.category, state.currentWord);
+            state.currentWord = nextWord.word;
+            state.currentWordCat = nextWord.cat;
+            isWordHidden = false;
+            renderUI();
+            pushStateToSync();
+            triggerFlash(false, "🔄 Partie remise à zéro !");
+        };
+
+        window.handleWordFound = function() {
+            ensureAudioContext();
+            if (state.activeTeam === 1) {
+                state.team1Score += 1;
+            } else {
+                state.team2Score += 1;
+            }
+            state.eventCounter = (state.eventCounter || 0) + 1;
+            state.lastEventType = "found";
+            lastEventCounterSeen = state.eventCounter;
+
+            const nextWord = pickRandomWordItem(state.category, state.currentWord);
+            state.currentWord = nextWord.word;
+            state.currentWordCat = nextWord.cat;
+            isWordHidden = false;
+
+            playChime();
+            const teamName = state.activeTeam === 1 ? state.team1Name : state.team2Name;
+            triggerFlash(true, `🎉 +1 POINT pour ${teamName} !`);
+            renderUI();
+            pushStateToSync();
+        };
+
+        window.handleWordSkip = function() {
+            ensureAudioContext();
+            const nextWord = pickRandomWordItem(state.category, state.currentWord);
+            state.currentWord = nextWord.word;
+            state.currentWordCat = nextWord.cat;
+            isWordHidden = false;
+            renderUI();
+            pushStateToSync();
+        };
+
+        window.toggleWordPrivacy = function() {
+            isWordHidden = !isWordHidden;
+            renderUI();
+        };
+
+        function formatSeconds(sec) {
+            const s = Math.max(0, Math.floor(sec));
+            const mins = Math.floor(s / 60);
+            const rem = s % 60;
+            return `${String(mins).padStart(2, "0")}:${String(rem).padStart(2, "0")}`;
+        }
+
+        function renderWaitingRoomLists() {
+            const playersArr = Object.values(state.players || {});
+            const t1Players = playersArr.filter((p) => p && p.team === 1);
+            const t2Players = playersArr.filter((p) => p && p.team === 2);
+
+            // Mise à jour TV Waiting Room
+            const tvTotalBadge = document.getElementById("tv-total-players-badge");
+            if (tvTotalBadge) {
+                const count = playersArr.length;
+                tvTotalBadge.innerText = `${count} joueur${count > 1 ? "s" : ""}`;
+            }
+            const tvT1Count = document.getElementById("tv-team1-count");
+            const tvT2Count = document.getElementById("tv-team2-count");
+            if (tvT1Count) tvT1Count.innerText = String(t1Players.length);
+            if (tvT2Count) tvT2Count.innerText = String(t2Players.length);
+
+            const tvT1List = document.getElementById("tv-team1-players-list");
+            const tvT2List = document.getElementById("tv-team2-players-list");
+            if (tvT1List) {
+                tvT1List.innerHTML = t1Players.length > 0
+                    ? t1Players.map((p) => `<span class="px-2.5 py-1 rounded-full bg-pink-100 text-pink-900 text-xs font-extrabold border border-pink-300">📱 ${escapeHtml(p.name)}</span>`).join("")
+                    : `<span class="text-xs italic text-pink-400">En attente de joueurs...</span>`;
+            }
+            if (tvT2List) {
+                tvT2List.innerHTML = t2Players.length > 0
+                    ? t2Players.map((p) => `<span class="px-2.5 py-1 rounded-full bg-purple-100 text-purple-900 text-xs font-extrabold border border-purple-300">📱 ${escapeHtml(p.name)}</span>`).join("")
+                    : `<span class="text-xs italic text-purple-400">En attente de joueurs...</span>`;
+            }
+
+            // Mise à jour écran choix d'équipe Mime
+            const c1Name = document.getElementById("mime-choice-team1-name");
+            const c2Name = document.getElementById("mime-choice-team2-name");
+            const c1Count = document.getElementById("mime-choice-team1-count");
+            const c2Count = document.getElementById("mime-choice-team2-count");
+            if (c1Name) c1Name.innerText = state.team1Name;
+            if (c2Name) c2Name.innerText = state.team2Name;
+            if (c1Count) c1Count.innerText = `${t1Players.length} joueur${t1Players.length > 1 ? "s" : ""} prêt${t1Players.length > 1 ? "s" : ""}`;
+            if (c2Count) c2Count.innerText = `${t2Players.length} joueur${t2Players.length > 1 ? "s" : ""} prêt${t2Players.length > 1 ? "s" : ""}`;
+
+            // Mise à jour salle d'attente Mime
+            const chosenTeamEl = document.getElementById("mime-wait-chosen-team");
+            const playerBadgeEl = document.getElementById("mime-wait-player-badge");
+            if (chosenTeamEl) {
+                chosenTeamEl.innerText = localChosenTeam === 2 ? state.team2Name : state.team1Name;
+            }
+            if (playerBadgeEl) {
+                playerBadgeEl.innerText = `🎭 ${localPlayerName || "Joueur"}`;
+            }
+
+            const mimeWaitList = document.getElementById("mime-wait-players-list");
+            if (mimeWaitList) {
+                mimeWaitList.innerHTML = playersArr.length > 0
+                    ? playersArr.map((p) => {
+                        const tLabel = p.team === 2 ? state.team2Name : state.team1Name;
+                        const badgeColor = p.team === 2
+                            ? "bg-purple-100 text-purple-900 border-purple-300"
+                            : "bg-pink-100 text-pink-900 border-pink-300";
+                        return `<span class="px-2.5 py-1 rounded-full ${badgeColor} text-xs font-extrabold border">📱 ${escapeHtml(p.name)} (${escapeHtml(tLabel)})</span>`;
+                    }).join("")
+                    : `<span class="text-xs italic text-pink-500">En attente des autres joueurs...</span>`;
+            }
+
+            // Badges joueurs en partie sur l'Écran TV
+            const tvInT1 = document.getElementById("tv-ingame-team1-players");
+            const tvInT2 = document.getElementById("tv-ingame-team2-players");
+            if (tvInT1) {
+                tvInT1.innerHTML = t1Players.map((p) => `<span class="px-2 py-0.5 rounded-full bg-pink-200/70 text-pink-900 text-[11px] font-bold">📱 ${escapeHtml(p.name)}</span>`).join("");
+            }
+            if (tvInT2) {
+                tvInT2.innerHTML = t2Players.map((p) => `<span class="px-2 py-0.5 rounded-full bg-purple-200/70 text-purple-900 text-[11px] font-bold">📱 ${escapeHtml(p.name)}</span>`).join("");
+            }
+        }
+
+        function escapeHtml(str) {
+            return String(str || "")
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;");
+        }
+
+        function renderUI() {
+            // 1. Noms et scores des équipes (sans écraser le champ en cours de saisie)
+            const t1Input = document.getElementById("team1-name-input");
+            const t2Input = document.getElementById("team2-name-input");
+            const tvWaitT1 = document.getElementById("tv-wait-team1-input");
+            const tvWaitT2 = document.getElementById("tv-wait-team2-input");
+
+            if (t1Input && document.activeElement !== t1Input) t1Input.value = state.team1Name;
+            if (t2Input && document.activeElement !== t2Input) t2Input.value = state.team2Name;
+            if (tvWaitT1 && document.activeElement !== tvWaitT1) tvWaitT1.value = state.team1Name;
+            if (tvWaitT2 && document.activeElement !== tvWaitT2) tvWaitT2.value = state.team2Name;
+
+            renderWaitingRoomLists();
+
+            document.getElementById("tv-team1-score").innerText = state.team1Score;
+            document.getElementById("tv-team2-score").innerText = state.team2Score;
+
+            const t1Card = document.getElementById("tv-team1-card");
+            const t2Card = document.getElementById("tv-team2-card");
+            const t1Badge = document.getElementById("tv-team1-badge");
+            const t2Badge = document.getElementById("tv-team2-badge");
+
+            if (state.activeTeam === 1) {
+                t1Card.className = "p-5 rounded-3xl border-4 border-pink-500 bg-pink-50 shadow-md transition-all cursor-pointer relative";
+                t2Card.className = "p-5 rounded-3xl border-2 border-pink-200 bg-slate-50 transition-all cursor-pointer relative";
+                t1Badge.className = "px-2.5 py-0.5 rounded-full bg-pink-600 text-white text-[11px] font-black uppercase tracking-wider";
+                t1Badge.innerText = "🔥 Tour actuel";
+                t2Badge.className = "px-2.5 py-0.5 rounded-full bg-slate-200 text-slate-600 text-[11px] font-black uppercase tracking-wider";
+                t2Badge.innerText = "En attente";
+            } else {
+                t2Card.className = "p-5 rounded-3xl border-4 border-pink-500 bg-pink-50 shadow-md transition-all cursor-pointer relative";
+                t1Card.className = "p-5 rounded-3xl border-2 border-pink-200 bg-slate-50 transition-all cursor-pointer relative";
+                t2Badge.className = "px-2.5 py-0.5 rounded-full bg-pink-600 text-white text-[11px] font-black uppercase tracking-wider";
+                t2Badge.innerText = "🔥 Tour actuel";
+                t1Badge.className = "px-2.5 py-0.5 rounded-full bg-slate-200 text-slate-600 text-[11px] font-black uppercase tracking-wider";
+                t1Badge.innerText = "En attente";
+            }
+
+            const activeName = state.activeTeam === 1 ? state.team1Name : state.team2Name;
+            document.getElementById("tv-turn-status").innerHTML = `C'est au tour de <span class="text-amber-300 underline">${activeName}</span> de mimer !`;
+
+            // 2. Chronomètre synchronisé TV & Mime
+            const formattedTime = formatSeconds(state.timeLeft);
+            const tvTimerEl = document.getElementById("tv-timer-display");
+            const mimeTimerEl = document.getElementById("mime-timer-display");
+            tvTimerEl.innerText = formattedTime;
+            mimeTimerEl.innerText = formattedTime;
+
+            if (state.timeLeft <= 10 && state.isRunning) {
+                tvTimerEl.classList.add("text-rose-400", "animate-pulse-fast");
+                tvTimerEl.classList.remove("text-amber-300");
+            } else {
+                tvTimerEl.classList.remove("text-rose-400", "animate-pulse-fast");
+                tvTimerEl.classList.add("text-amber-300");
+            }
+
+            // 3. Boutons Chrono & Sélecteurs
+            const tvToggleBtn = document.getElementById("tv-timer-toggle-btn");
+            const mimeTimerStatus = document.getElementById("mime-timer-sync-status");
+            if (state.isRunning) {
+                tvToggleBtn.innerHTML = "⏸️ Pause chrono";
+                tvToggleBtn.className = "px-6 py-3.5 rounded-2xl bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-black text-base shadow-lg transition cursor-pointer flex items-center gap-2";
+                if (mimeTimerStatus) {
+                    mimeTimerStatus.innerHTML = "⏱️ Chrono en cours (sync TV)";
+                    mimeTimerStatus.className = "px-3.5 py-2 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200 font-extrabold text-xs";
+                }
+            } else {
+                tvToggleBtn.innerHTML = "▶️ Démarrer le chrono";
+                tvToggleBtn.className = "px-6 py-3.5 rounded-2xl bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white font-black text-base shadow-lg transition cursor-pointer flex items-center gap-2";
+                if (mimeTimerStatus) {
+                    mimeTimerStatus.innerHTML = "⏸️ Chrono en pause (sync TV)";
+                    mimeTimerStatus.className = "px-3.5 py-2 rounded-xl bg-pink-50 text-pink-700 border border-pink-200 font-bold text-xs";
+                }
+            }
+
+            document.getElementById("category-select").value = state.category;
+            document.getElementById("duration-select").value = String(state.duration);
+
+            // 4. Écran du Mime
+            document.getElementById("mime-active-team-name").innerText = activeName;
+            document.getElementById("mime-score-summary").innerText = `${state.team1Score} - ${state.team2Score}`;
+            document.getElementById("mime-category-badge").innerText = `🎭 ${state.currentWordCat || "À Mimer"}`;
+
+            const mimeHeaderTag = document.getElementById("mime-header-team-tag");
+            if (mimeHeaderTag && localChosenTeam) {
+                const myTeamLabel = localChosenTeam === 2 ? state.team2Name : state.team1Name;
+                mimeHeaderTag.innerText = `• ${localPlayerName || "Joueur"} (${myTeamLabel})`;
+            }
+
+            const secretWordEl = document.getElementById("mime-secret-word");
+            const hideBtnEl = document.getElementById("toggle-hide-btn");
+            if (isWordHidden) {
+                secretWordEl.innerText = "••••••••••";
+                secretWordEl.classList.add("tracking-widest", "opacity-40");
+                hideBtnEl.innerHTML = "👁️ Afficher le mot";
+            } else {
+                secretWordEl.innerText = state.currentWord;
+                secretWordEl.classList.remove("tracking-widest", "opacity-40");
+                hideBtnEl.innerHTML = "🙈 Masquer le mot";
+            }
+        }
+
+        // =====================================================================
+        // BOUCLE DE CHRONOMÈTRE EN TEMPS RÉEL (BASÉE SUR L'HORODATAGE PARTAGÉ)
+        // =====================================================================
+        function startTimerLoop() {
+            if (timerLoop) clearInterval(timerLoop);
+            timerLoop = setInterval(() => {
+                if (!state.isRunning || !state.timerEndTimestamp) return;
+                const remaining = Math.max(0, Math.ceil((state.timerEndTimestamp - Date.now()) / 1000));
+                if (remaining !== state.timeLeft) {
+                    state.timeLeft = remaining;
+                    renderUI();
+                }
+                if (remaining <= 0) {
+                    state.isRunning = false;
+                    state.timerEndTimestamp = null;
+                    state.timeLeft = 0;
+                    playTimeUpBuzzer();
+                    triggerFlash(false, "⏰ TEMPS ÉCOULÉ !");
+                    renderUI();
+                    if (currentRole === "tv") {
+                        pushStateToSync();
+                    }
+                }
+            }, 250);
+        }
+
+        // Démarrage initial
+        renderUI();
+        startTimerLoop();
+        initSync();
+    </script>
+</body>
+</html>
